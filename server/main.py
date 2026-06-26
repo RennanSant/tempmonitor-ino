@@ -135,52 +135,12 @@ def _wmi_temperatura_cpu():
     return None
 
 
-def _acpi_temperatura_cpu():
-    """Fallback que le a temperatura via ACPI (namespace WMI root\\WMI).
-
-    Nao depende do driver ring0 do LibreHardwareMonitor, entao funciona mesmo
-    com a Integridade de Memoria (HVCI) ativa. Exige privilegios de admin e
-    nem todo notebook expoe uma zona termica util (pode ser da placa, nao do
-    nucleo da CPU).
-    """
-    try:
-        import wmi
-    except Exception:
-        return None
-
-    try:
-        connection = wmi.WMI(namespace="root\\WMI")
-        zonas = connection.MSAcpi_ThermalZoneTemperature()
-    except Exception:
-        return None
-
-    valores = []
-    for zona in zonas:
-        bruto = getattr(zona, "CurrentTemperature", None)
-        if bruto is None:
-            continue
-
-        try:
-            # CurrentTemperature vem em decimos de Kelvin.
-            celsius = float(bruto) / 10.0 - 273.15
-        except (TypeError, ValueError):
-            continue
-
-        if 0.0 < celsius < 125.0:
-            valores.append(celsius)
-
-    if valores:
-        return max(valores)
-
-    return None
-
-
 def _fallback_temperatura_cpu():
-    valor = _wmi_temperatura_cpu()
-    if valor is not None:
-        return valor
-
-    return _acpi_temperatura_cpu()
+    # Se a leitura real (LibreHardwareMonitor + PawnIO) falhar, retornamos None
+    # de proposito: a API responde 501 e o painel mostra "N/D" (honesto), em vez
+    # de uma fonte enganosa como o ACPI -- que em alguns notebooks reporta uma
+    # zona da placa, quase constante (foi o caso do "36 fixo").
+    return _wmi_temperatura_cpu()
 
 
 def obter_temperatura_cpu():

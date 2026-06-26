@@ -1,96 +1,61 @@
+# Servidor TempMonitor (Python)
 
-# Monitor de Temperatura
+API REST que roda em cada PC monitorado e expõe a temperatura de CPU e GPU. O
+ESP8266 (firmware em `../firmware`) consulta esta API e mostra os valores no
+display. Para a visão geral do sistema, veja o [README do projeto](../README.md).
 
-Este projeto consiste em um sistema de monitoramento de temperatura de CPU e GPU de computadores remotos. Ele utiliza um ESP8266 com display OLED para exibir as temperaturas em tempo real, conectando-se a uma API web hospedada nos PCs monitorados.
+## O que tem nesta pasta
 
-## Componentes do Projeto
+| Item | Função |
+|---|---|
+| `main.py` | O servidor Flask (a API). |
+| `python_code.bat` | Lançador: eleva via UAC, configura o firewall e inicia o `main.py`. |
+| `firewall_setup.ps1` | Cria as regras de firewall (porta 5000 + ping ICMP). |
+| `vendor/` | Biblioteca **LibreHardwareMonitor** (DLLs .NET) que o `main.py` carrega para ler os sensores. |
 
-- **Script Python (API)**: `.\main.py` - API web REST que fornece as temperaturas (executar como administrador).
-- **Inicializador**: `.\python_code.bat` - Eleva via UAC, configura o firewall e inicia o `main.py`.
-- **Configuração de firewall**: `.\firewall_setup.bat` e `.\firewall_setup.ps1` - Liberam a porta 5000 e o ping (ICMP).
-- **Cliente Arduino (ESP8266)**: o sketch em uso fica no projeto PlatformIO `arduino-proj-1` (`src/main.cpp`).
-- **Versões antigas**: `.\legado\` - sketch `.ino` antigo (com a lib `ESP8266Ping`) e o `script_temperatura.py`, mantidos apenas como referência.
+## Requisitos
 
-## Funcionalidades
+- **Python 3** com as dependências:
+  ```
+  pip install Flask pythonnet wmi
+  ```
+- **`vendor/LibreHardwareMonitor`** — a biblioteca que lê o hardware (já incluída).
+- **PawnIO** — driver de kernel (assinado, compatível com a Integridade de
+  Memória) que o LibreHardwareMonitor usa para acessar a CPU. Instale uma vez:
+  ```
+  winget install namazso.PawnIO
+  ```
+  > Sem o PawnIO, a temperatura da **CPU** lê 0 (a GPU funciona sem ele). O
+  > PawnIO (driver/acesso) e o `vendor/` (biblioteca/lógica) são complementares —
+  > precisa dos dois.
 
-- Conexão Wi-Fi para comunicação com a rede.
-- Verificação de conectividade via ping para múltiplos PCs.
-- Requisições HTTP para obter temperaturas de CPU e GPU via API REST.
-- Exibição das temperaturas em um display OLED SSD1306.
-- Suporte para monitoramento de até dois PCs simultaneamente.
+## Como executar
 
-## Instalação e Configuração
+Como **administrador** (necessário para ler a CPU e configurar o firewall):
 
-### 1. Parte Python (Servidor API)
+- Dê um duplo-clique em `python_code.bat` (ele eleva sozinho via UAC), ou
+- Rode direto num terminal admin: `python main.py`
 
-1. Instale as dependências Python:
-   ```
-   pip install Flask pythonnet wmi
-   ```
-   > O `main.py` usa a DLL do LibreHardwareMonitor (já incluída em `vendor/`)
-   > via `pythonnet` (módulo `clr`). O `wmi` é um fallback opcional para a CPU.
-   > A leitura da **temperatura da CPU exige execução como administrador**.
+A API sobe em `http://0.0.0.0:5000`.
 
-2. Execute o script como administrador:
-   - Use `python_code.bat` ou execute diretamente: `python main.py`
-   - Certifique-se de que a porta 5000 está liberada no firewall.
+## Endpoints
 
-3. A API estará disponível em `http://localhost:5000` com os endpoints:
-   - `GET /cpu-temp`: Retorna a temperatura da CPU em JSON.
-   - `GET /gpu-temp`: Retorna a temperatura da GPU em JSON.
+| Método | Rota | Retorno |
+|---|---|---|
+| GET | `/cpu-temp` | `{"temperatura_cpu": <°C>, "unidade": "Celsius"}` (HTTP 501 se indisponível) |
+| GET | `/gpu-temp` | `{"temperatura_gpu": <°C>, "unidade": "Celsius"}` |
+| GET | `/sensors` | Lista completa de sensores detectados (diagnóstico) |
+| GET | `/` | Página de boas-vindas |
 
-### 2. Parte Arduino (Cliente)
+## Instalar num PC novo
 
-1. Instale as bibliotecas no Arduino IDE:
-   - ESP8266WiFi
-   - ESP8266HTTPClient
-   - WiFiClient
-   - ArduinoJson
-   - ESP8266Ping (incluído no projeto)
-   - SPI
-   - Wire
-   - Adafruit_GFX
-   - Adafruit_SSD1306
+Não precisa copiar esta pasta manualmente: o painel (ESP) hospeda um instalador.
+No PC a monitorar, num PowerShell **administrador**, rode o comando que aparece
+na tela web do ESP:
 
-2. Configure as credenciais no código do sketch (`arduino-proj-1/src/main.cpp`):
-   - `ssid`: Nome da rede Wi-Fi.
-   - `password`: Senha da rede Wi-Fi.
-   - `cpuEndpointUrlPc01` e `gpuEndpointUrlPc01`: URLs da API para o PC 1.
-   - `cpuEndpointUrlPc02` e `gpuEndpointUrlPc02`: URLs da API para o PC 2.
-   - `pc01IP` e `pc02IP`: Endereços IP dos PCs.
+```
+irm http://<ip-do-painel>/download/setup.ps1 | iex
+```
 
-3. Faça upload do código para o ESP8266.
-
-4. Conecte o display OLED SSD1306 aos pinos apropriados (I2C: SDA, SCL).
-
-## Como Usar
-
-1. Inicie o servidor Python em cada PC a ser monitorado.
-2. Configure os IPs e URLs no código Arduino.
-3. Faça upload e ligue o ESP8266.
-4. O display mostrará as temperaturas dos PCs online.
-
-## Notas
-
-- O código suporta ESP8266; para ESP32, ajuste as bibliotecas (WiFi.h, HTTPClient.h).
-- Certifique-se de que o isolamento de AP no roteador está desativado para permitir ping.
-- Em caso de erro, verifique os logs no Serial Monitor do Arduino IDE.
-- A pasta `legado/` contém versões antigas (sketch `.ino` e `script_temperatura.py`) que **não são mais usadas** — ficam apenas como referência.
-
-## Dependências
-
-### Python
-- Flask
-- pythonnet (fornece o módulo `clr`)
-- wmi (fallback opcional para a leitura da CPU)
-
-### Arduino
-- ESP8266WiFi
-- ESP8266HTTPClient
-- WiFiClient
-- ArduinoJson
-- ESP8266Ping
-- SPI
-- Wire
-- Adafruit_GFX
-- Adafruit_SSD1306
+Ele instala tudo (Python, dependências, PawnIO, LibreHardwareMonitor) e configura
+o firewall. Início do servidor é **manual** (`python main.py` como admin).

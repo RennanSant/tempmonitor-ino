@@ -2,13 +2,13 @@
 firmware/src/secrets.h
 
 # PlatformIO (artefatos de build, regeneraveis)
-firmware/.pio/
+.pio/
 
 # VSCode / PlatformIO gerados (contem caminhos da maquina)
-firmware/.vscode/.browse.c_cpp.db*
-firmware/.vscode/c_cpp_properties.json
-firmware/.vscode/launch.json
-firmware/.vscode/ipch/
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch/
 
 # Python
 __pycache__/
